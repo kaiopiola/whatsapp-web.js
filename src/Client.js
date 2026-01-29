@@ -767,17 +767,28 @@ class Client extends EventEmitter {
             window.Store.Call.on('add', (call) => { window.onIncomingCall(call); });
             window.Store.Chat.on('remove', async (chat) => { window.onRemoveChatEvent(await window.WWebJS.getChatModel(chat)); });
             window.Store.Chat.on('change:archive', async (chat, currState, prevState) => { window.onArchiveChatEvent(await window.WWebJS.getChatModel(chat), currState, prevState); });
-            window.Store.Msg.on('add', (msg) => { 
+
+            const handleNewMessage = (msg) => {
                 if (msg.isNewMsg) {
                     if(msg.type === 'ciphertext') {
                         // defer message event until ciphertext is resolved (type changed)
                         msg.once('change:type', (_msg) => window.onAddMessageEvent(window.WWebJS.getMessageModel(_msg)));
                         window.onAddMessageCiphertextEvent(window.WWebJS.getMessageModel(msg));
                     } else {
-                        window.onAddMessageEvent(window.WWebJS.getMessageModel(msg)); 
+                        window.onAddMessageEvent(window.WWebJS.getMessageModel(msg));
                     }
                 }
-            });
+            };
+
+            // Process any messages that might have been added before listener was attached
+            if (window.Store.Msg && window.Store.Msg.models) {
+                const recentMessages = window.Store.Msg.models.filter(msg => msg.isNewMsg);
+                recentMessages.forEach(msg => handleNewMessage(msg));
+            }
+
+            // Attach listener for future messages
+            window.Store.Msg.on('add', handleNewMessage);
+
             window.Store.Chat.on('change:unreadCount', (chat) => {window.onChatUnreadCountEvent(chat);});
 
             if (window.compareWwebVersions(window.Debug.VERSION, '>=', '2.3000.1014111620')) {
