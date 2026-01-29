@@ -560,7 +560,7 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(this.pupPage, 'onRemoveMessageEvent', (msg) => {
 
-            if (!msg.isNewMsg) return;
+            if (msg.isNewMsg === false) return;
 
             const message = new Message(this, msg);
 
@@ -760,7 +760,7 @@ class Client extends EventEmitter {
             window.Store.Msg.on('change:type', (msg) => { window.onChangeMessageTypeEvent(window.WWebJS.getMessageModel(msg)); });
             window.Store.Msg.on('change:ack', (msg, ack) => { window.onMessageAckEvent(window.WWebJS.getMessageModel(msg), ack); });
             window.Store.Msg.on('change:isUnsentMedia', (msg, unsent) => { if (msg.id.fromMe && !unsent) window.onMessageMediaUploadedEvent(window.WWebJS.getMessageModel(msg)); });
-            window.Store.Msg.on('remove', (msg) => { if (msg.isNewMsg) window.onRemoveMessageEvent(window.WWebJS.getMessageModel(msg)); });
+            window.Store.Msg.on('remove', (msg) => { if (msg.isNewMsg !== false) window.onRemoveMessageEvent(window.WWebJS.getMessageModel(msg)); });
             window.Store.Msg.on('change:body change:caption', (msg, newBody, prevBody) => { window.onEditMessageEvent(window.WWebJS.getMessageModel(msg), newBody, prevBody); });
             window.Store.AppState.on('change:state', (_AppState, state) => { window.onAppStateChangedEvent(state); });
             window.Store.Conn.on('change:battery', (state) => { window.onBatteryStateChangedEvent(state); });
@@ -768,49 +768,21 @@ class Client extends EventEmitter {
             window.Store.Chat.on('remove', async (chat) => { window.onRemoveChatEvent(await window.WWebJS.getChatModel(chat)); });
             window.Store.Chat.on('change:archive', async (chat, currState, prevState) => { window.onArchiveChatEvent(await window.WWebJS.getChatModel(chat), currState, prevState); });
 
-            const handleNewMessage = (msg) => {
-                console.log('[WWebJS] Message add event triggered:', {
-                    isNewMsg: msg.isNewMsg,
-                    type: msg.type,
-                    hasBody: !!msg.body,
-                    from: msg.from,
-                    id: msg.id?._serialized
-                });
-
-                if (msg.isNewMsg) {
-                    console.log('[WWebJS] Processing new message');
+            window.Store.Msg.on('add', (msg) => {
+                // Check if msg.isNewMsg is true or undefined (not explicitly false)
+                // In newer WhatsApp Web versions, isNewMsg can be undefined for new messages
+                if (msg.isNewMsg !== false) {
                     if(msg.type === 'ciphertext') {
-                        console.log('[WWebJS] Message is ciphertext, deferring');
                         // defer message event until ciphertext is resolved (type changed)
-                        msg.once('change:type', (_msg) => {
-                            console.log('[WWebJS] Ciphertext resolved, calling onAddMessageEvent');
-                            window.onAddMessageEvent(window.WWebJS.getMessageModel(_msg));
-                        });
-                        window.onAddMessageCiphertextEvent(window.WWebJS.getMessageModel(msg));
+                        msg.once('change:type', (_msg) => window.onAddMessageEvent(window.WWebJS.getMessageModel(_msg)));
+                        if (window.onAddMessageCiphertextEvent) {
+                            window.onAddMessageCiphertextEvent(window.WWebJS.getMessageModel(msg));
+                        }
                     } else {
-                        console.log('[WWebJS] Calling onAddMessageEvent directly');
                         window.onAddMessageEvent(window.WWebJS.getMessageModel(msg));
                     }
-                } else {
-                    console.log('[WWebJS] Message ignored - isNewMsg is false');
                 }
-            };
-
-            console.log('[WWebJS] Registering message listeners');
-            console.log('[WWebJS] window.Store.Msg exists:', !!window.Store.Msg);
-            console.log('[WWebJS] window.Store.Msg.models exists:', !!window.Store.Msg?.models);
-            console.log('[WWebJS] Number of messages in cache:', window.Store.Msg?.models?.length || 0);
-
-            // Process any messages that might have been added before listener was attached
-            if (window.Store.Msg && window.Store.Msg.models) {
-                const recentMessages = window.Store.Msg.models.filter(msg => msg.isNewMsg);
-                console.log('[WWebJS] Found', recentMessages.length, 'recent messages to process');
-                recentMessages.forEach(msg => handleNewMessage(msg));
-            }
-
-            // Attach listener for future messages
-            console.log('[WWebJS] Attaching listener to window.Store.Msg add event');
-            window.Store.Msg.on('add', handleNewMessage);
+            });
 
             window.Store.Chat.on('change:unreadCount', (chat) => {window.onChatUnreadCountEvent(chat);});
 
