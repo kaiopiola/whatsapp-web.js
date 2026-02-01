@@ -5,13 +5,16 @@
     </p>
     <br />
     <p>
-		<a href="https://www.npmjs.com/package/whatsapp-web.js"><img src="https://img.shields.io/npm/v/whatsapp-web.js.svg" alt="npm" /></a>
-        <a href="https://depfu.com/github/pedroslopez/whatsapp-web.js?project_id=9765"><img src="https://badges.depfu.com/badges/4a65a0de96ece65fdf39e294e0c8dcba/overview.svg" alt="Depfu" /></a>
+		<a href="https://www.npmjs.com/package/@kaiopiola/whatsapp-web.js"><img src="https://img.shields.io/npm/v/@kaiopiola/whatsapp-web.js.svg" alt="npm" /></a>
         <img src="https://img.shields.io/badge/WhatsApp_Web-2.3000.1017054665-brightgreen.svg" alt="WhatsApp_Web 2.2346.52" />
-        <a href="https://discord.gg/H7DqQs4"><img src="https://img.shields.io/discord/698610475432411196.svg?logo=discord" alt="Discord server" /></a>
+        <a href="https://github.com/kaiopiola/whatsapp-web.js"><img src="https://img.shields.io/github/stars/kaiopiola/whatsapp-web.js?style=social" alt="GitHub stars" /></a>
 	</p>
     <br />
 </div>
+
+> **🔧 This is a fork of [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js) with bug fixes and improvements.**
+>
+> This fork includes critical fixes for message handling, app state synchronization, and other stability improvements.
 
 ## About
 **A WhatsApp API client that operates via the WhatsApp Web browser.**
@@ -23,7 +26,8 @@ The library launches the WhatsApp Web browser app via Puppeteer, accessing its i
 
 ## Links
 
-* [GitHub][gitHub]
+* [GitHub (This Fork)][gitHub]
+* [Original Project][original-github]
 * [Guide][guide] ([source][guide-source])
 * [Documentation][documentation] ([source][documentation-source])
 * [Discord Server][discord]
@@ -31,16 +35,35 @@ The library launches the WhatsApp Web browser app via Puppeteer, accessing its i
 
 ## Installation
 
-The module is available on [npm][npm] via `npm i whatsapp-web.js`!
+### Install from NPM
+```bash
+npm i @kaiopiola/whatsapp-web.js
+```
+
+### Install from GitHub
+```bash
+npm i github:kaiopiola/whatsapp-web.js
+```
 
 > [!NOTE]
 > **Node ``v18`` or higher, is required.**  
 > See the [Guide][guide] for quick upgrade instructions.
 
+## What's Different in This Fork?
+
+This fork includes several bug fixes and improvements:
+- Fixed message handling and triggers
+- Enhanced app state synchronization
+- Improved message processing for recent messages
+- Better logging for debugging
+- Various stability improvements
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
+
 ## Example usage
 
 ```js
-const { Client } = require('whatsapp-web.js');
+const { Client } = require('@kaiopiola/whatsapp-web.js');
 
 const client = new Client();
 
@@ -107,15 +130,16 @@ Something missing? Make an issue and let us know!
 
 ## Contributing
 
-Feel free to open pull requests; we welcome contributions! However, for significant changes, it's best to open an issue beforehand. Make sure to review our [contribution guidelines][contributing] before creating a pull request. Before creating your own issue or pull request, always check to see if one already exists!
+Feel free to open pull requests; we welcome contributions! However, for significant changes, it's best to open an issue beforehand.
 
-## Supporting the project
+If you find a bug or have a feature request, please open an issue at [https://github.com/kaiopiola/whatsapp-web.js/issues](https://github.com/kaiopiola/whatsapp-web.js/issues).
 
-You can support the maintainer of this project through the links below
+## Supporting the Original Project
+
+This is a fork of the original whatsapp-web.js. Consider supporting the original maintainer:
 
 - [Support via GitHub Sponsors][gitHub-sponsors]
 - [Support via PayPal][support-payPal]
-- [Sign up for DigitalOcean][digitalocean] and get $200 in credit when you sign up (Referral)
 
 ## Disclaimer
 
@@ -141,15 +165,16 @@ limitations under the License.
 [documentation]: https://docs.wwebjs.dev/
 [documentation-source]: https://github.com/pedroslopez/whatsapp-web.js/tree/main/docs
 [discord]: https://discord.gg/H7DqQs4
-[gitHub]: https://github.com/pedroslopez/whatsapp-web.js
-[npm]: https://npmjs.org/package/whatsapp-web.js
+[gitHub]: https://github.com/kaiopiola/whatsapp-web.js
+[original-github]: https://github.com/pedroslopez/whatsapp-web.js
+[npm]: https://npmjs.org/package/@kaiopiola/whatsapp-web.js
 [nodejs]: https://nodejs.org/en/download/
-[examples]: https://github.com/pedroslopez/whatsapp-web.js/blob/master/example.js
+[examples]: https://github.com/kaiopiola/whatsapp-web.js/blob/main/example.js
 [auth-strategies]: https://wwebjs.dev/guide/creating-your-bot/authentication.html
 [google-chrome]: https://wwebjs.dev/guide/creating-your-bot/handling-attachments.html#caveat-for-sending-videos-and-gifs
 [deprecated-video]: https://www.youtube.com/watch?v=hv1R1rLeVVE
 [gitHub-sponsors]: https://github.com/sponsors/pedroslopez
 [support-payPal]: https://www.paypal.me/psla/
 [digitalocean]: https://m.do.co/c/73f906a36ed4
-[contributing]: https://github.com/pedroslopez/whatsapp-web.js/blob/main/CODE_OF_CONDUCT.md
+[contributing]: https://github.com/kaiopiola/whatsapp-web.js/blob/main/CODE_OF_CONDUCT.md
 [whatsapp]: https://whatsapp.com
