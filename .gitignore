@@ -75,10 +75,12 @@ typings/
 # local version cache
 .wwebjs_cache/
 .wwebjs_auth_test/
+.wwebjs_auth_quicktest/
 
 # Test files
 test-local.js
 README-TESTE.md
+quick-test.js
 
 # IDE's
 .idea

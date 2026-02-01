@@ -212,33 +212,40 @@ class Client extends EventEmitter {
         });
 
         await exposeFunctionIfAbsent(this.pupPage, 'onAppStateHasSyncedEvent', async () => {
+            console.log('[DEBUG] onAppStateHasSyncedEvent iniciado');
             const authEventPayload = await this.authStrategy.getAuthEventPayload();
             /**
                  * Emitted when authentication is successful
                  * @event Client#authenticated
                  */
             this.emit(Events.AUTHENTICATED, authEventPayload);
+            console.log('[DEBUG] Event AUTHENTICATED emitido');
 
             const injected = await this.pupPage.evaluate(async () => {
                 return typeof window.Store !== 'undefined' && typeof window.WWebJS !== 'undefined';
             });
+            console.log('[DEBUG] injected =', injected);
 
             if (!injected) {
+                console.log('[DEBUG] Store não injetado ainda, iniciando injeção...');
                 if (this.options.webVersionCache.type === 'local' && this.currentIndexHtml) {
                     const { type: webCacheType, ...webCacheOptions } = this.options.webVersionCache;
                     const webCache = WebCacheFactory.createWebCache(webCacheType, webCacheOptions);
-            
+
                     await webCache.persist(this.currentIndexHtml, version);
                 }
 
                 if (isCometOrAbove) {
+                    console.log('[DEBUG] Usando ExposeStore (Comet)');
                     await this.pupPage.evaluate(ExposeStore);
                 } else {
+                    console.log('[DEBUG] Usando ExposeLegacyStore (delay 2s)');
                     // make sure all modules are ready before injection
                     // 2 second delay after authentication makes sense and does not need to be made dyanmic or removed
-                    await new Promise(r => setTimeout(r, 2000)); 
+                    await new Promise(r => setTimeout(r, 2000));
                     await this.pupPage.evaluate(ExposeLegacyStore);
                 }
+                console.log('[DEBUG] Aguardando window.Store estar disponível...');
                 let start = Date.now();
                 let res = false;
                 while(start > (Date.now() - 30000)){
@@ -248,9 +255,11 @@ class Client extends EventEmitter {
                     await new Promise(r => setTimeout(r, 200));
                 }
                 if(!res){
+                    console.error('[DEBUG] TIMEOUT esperando window.Store!');
                     throw 'ready timeout';
                 }
-            
+                console.log('[DEBUG] window.Store disponível!');
+
                 /**
                      * Current connection information
                      * @type {ClientInfo}
@@ -263,15 +272,21 @@ class Client extends EventEmitter {
 
                 //Load util functions (serializers, helper functions)
                 await this.pupPage.evaluate(LoadUtils);
-
-                await this.attachEventListeners();
             }
+
+            // SEMPRE chamar attachEventListeners, mesmo quando já está injetado (reconexão)
+            console.log('[DEBUG] Chamando attachEventListeners...');
+            await this.attachEventListeners();
+            console.log('[DEBUG] attachEventListeners concluído');
             /**
                  * Emitted when the client has initialized and is ready to receive messages.
                  * @event Client#ready
                  */
+            console.log('[DEBUG] Emitindo evento READY');
             this.emit(Events.READY);
+            console.log('[DEBUG] Evento READY emitido');
             this.authStrategy.afterAuthReady();
+            console.log('[DEBUG] onAppStateHasSyncedEvent concluído');
         });
         let lastPercent = null;
         await exposeFunctionIfAbsent(this.pupPage, 'onOfflineProgressUpdateEvent', async (percent) => {
@@ -286,17 +301,21 @@ class Client extends EventEmitter {
         });
         await this.pupPage.evaluate(() => {
             const appState = window.AuthStore.AppState;
+            console.log('[DEBUG] Verificando AppState.hasSynced:', appState.hasSynced);
             if (appState.hasSynced) {
+                console.log('[DEBUG] AppState já sincronizado, chamando onAppStateHasSyncedEvent()');
                 window.onAppStateHasSyncedEvent();
             }
             appState.on('change:hasSynced', (_AppState, hasSynced) => {
+                console.log('[DEBUG] Event change:hasSynced disparado, hasSynced =', hasSynced);
                 if (hasSynced) {
+                    console.log('[DEBUG] Chamando onAppStateHasSyncedEvent() via evento');
                     window.onAppStateHasSyncedEvent();
                 }
             });
             appState.on('change:state', (_AppState, state) => { window.onAuthAppStateChangedEvent(state); });
             window.AuthStore.Cmd.on('offline_progress_update', () => {
-                window.onOfflineProgressUpdateEvent(window.AuthStore.OfflineMessageHandler.getOfflineDeliveryProgress()); 
+                window.onOfflineProgressUpdateEvent(window.AuthStore.OfflineMessageHandler.getOfflineDeliveryProgress());
             });
             window.AuthStore.Cmd.on('logout', async () => {
                 await window.onLogoutEvent();
@@ -429,6 +448,8 @@ class Client extends EventEmitter {
      * @property {boolean} reinject is this a reinject?
      */
     async attachEventListeners() {
+        console.log('[DEBUG] attachEventListeners() chamado');
+        console.log('[DEBUG] Registrando onAddMessageEvent...');
         await exposeFunctionIfAbsent(this.pupPage, 'onAddMessageEvent', msg => {
             if (msg.type === 'gp2') {
                 const notification = new GroupNotification(this, msg);
@@ -493,6 +514,7 @@ class Client extends EventEmitter {
                  */
             this.emit(Events.MESSAGE_RECEIVED, message);
         });
+        console.log('[DEBUG] onAddMessageEvent registrado');
 
         let last_message;
 
@@ -519,6 +541,7 @@ class Client extends EventEmitter {
             }
 
         });
+        console.log('[DEBUG] onChangeMessageTypeEvent registrado');
 
         await exposeFunctionIfAbsent(this.pupPage, 'onChangeMessageEvent', (msg) => {
 
@@ -655,6 +678,7 @@ class Client extends EventEmitter {
                  */
             this.emit(Events.BATTERY_CHANGED, { battery, plugged });
         });
+        console.log('[DEBUG] Metade dos event handlers registrados');
 
         await exposeFunctionIfAbsent(this.pupPage, 'onIncomingCall', (call) => {
             /**
@@ -754,37 +778,84 @@ class Client extends EventEmitter {
                 this.emit(Events.VOTE_UPDATE, new PollVote(this, vote));
             }
         });
+        console.log('[DEBUG] Todos os exposeFunctionIfAbsent completados, indo para pupPage.evaluate');
 
-        await this.pupPage.evaluate(() => {
+        try {
+            await this.pupPage.evaluate(async () => {
+            console.log('[DEBUG] Registrando listeners do Store.Msg...');
+            console.log('[DEBUG] window.Store.Msg existe?', !!window.Store?.Msg);
+
+            // Aguardar window.Store.Msg estar disponível
+            let attempts = 0;
+            while (!window.Store?.Msg && attempts < 50) {
+                console.log(`[DEBUG] Aguardando window.Store.Msg... tentativa ${attempts + 1}`);
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+
+            if (!window.Store?.Msg) {
+                throw new Error('window.Store.Msg não disponível após 5 segundos');
+            }
+
+            console.log('[DEBUG] window.Store.Msg disponível! Registrando listeners...');
+
             window.Store.Msg.on('change', (msg) => { window.onChangeMessageEvent(window.WWebJS.getMessageModel(msg)); });
             window.Store.Msg.on('change:type', (msg) => { window.onChangeMessageTypeEvent(window.WWebJS.getMessageModel(msg)); });
             window.Store.Msg.on('change:ack', (msg, ack) => { window.onMessageAckEvent(window.WWebJS.getMessageModel(msg), ack); });
             window.Store.Msg.on('change:isUnsentMedia', (msg, unsent) => { if (msg.id.fromMe && !unsent) window.onMessageMediaUploadedEvent(window.WWebJS.getMessageModel(msg)); });
             window.Store.Msg.on('remove', (msg) => { if (msg.isNewMsg !== false) window.onRemoveMessageEvent(window.WWebJS.getMessageModel(msg)); });
             window.Store.Msg.on('change:body change:caption', (msg, newBody, prevBody) => { window.onEditMessageEvent(window.WWebJS.getMessageModel(msg), newBody, prevBody); });
-            window.Store.AppState.on('change:state', (_AppState, state) => { window.onAppStateChangedEvent(state); });
-            window.Store.Conn.on('change:battery', (state) => { window.onBatteryStateChangedEvent(state); });
-            window.Store.Call.on('add', (call) => { window.onIncomingCall(call); });
-            window.Store.Chat.on('remove', async (chat) => { window.onRemoveChatEvent(await window.WWebJS.getChatModel(chat)); });
-            window.Store.Chat.on('change:archive', async (chat, currState, prevState) => { window.onArchiveChatEvent(await window.WWebJS.getChatModel(chat), currState, prevState); });
+
+            if (window.Store.AppState) {
+                window.Store.AppState.on('change:state', (_AppState, state) => { window.onAppStateChangedEvent(state); });
+            }
+
+            if (window.Store.Conn) {
+                window.Store.Conn.on('change:battery', (state) => { window.onBatteryStateChangedEvent(state); });
+            }
+
+            if (window.Store.Call) {
+                window.Store.Call.on('add', (call) => { window.onIncomingCall(call); });
+            }
+
+            if (window.Store.Chat) {
+                window.Store.Chat.on('remove', async (chat) => { window.onRemoveChatEvent(await window.WWebJS.getChatModel(chat)); });
+                window.Store.Chat.on('change:archive', async (chat, currState, prevState) => { window.onArchiveChatEvent(await window.WWebJS.getChatModel(chat), currState, prevState); });
+            }
 
             window.Store.Msg.on('add', (msg) => {
+                console.log('[DEBUG] Msg.on(add) disparado:', {
+                    isNewMsg: msg.isNewMsg,
+                    type: msg.type,
+                    id: msg.id?._serialized,
+                    body: msg.body?.substring(0, 30)
+                });
+
                 // Check if msg.isNewMsg is true or undefined (not explicitly false)
                 // In newer WhatsApp Web versions, isNewMsg can be undefined for new messages
                 if (msg.isNewMsg !== false) {
+                    console.log('[DEBUG] Passando pelo filtro isNewMsg !== false');
                     if(msg.type === 'ciphertext') {
+                        console.log('[DEBUG] Tipo ciphertext - aguardando mudança de tipo');
                         // defer message event until ciphertext is resolved (type changed)
                         msg.once('change:type', (_msg) => window.onAddMessageEvent(window.WWebJS.getMessageModel(_msg)));
                         if (window.onAddMessageCiphertextEvent) {
                             window.onAddMessageCiphertextEvent(window.WWebJS.getMessageModel(msg));
                         }
                     } else {
+                        console.log('[DEBUG] Chamando onAddMessageEvent');
                         window.onAddMessageEvent(window.WWebJS.getMessageModel(msg));
                     }
+                } else {
+                    console.log('[DEBUG] Bloqueado pelo filtro isNewMsg === false');
                 }
             });
 
-            window.Store.Chat.on('change:unreadCount', (chat) => {window.onChatUnreadCountEvent(chat);});
+            if (window.Store.Chat) {
+                window.Store.Chat.on('change:unreadCount', (chat) => {window.onChatUnreadCountEvent(chat);});
+            }
+
+            console.log('[DEBUG] Listeners básicos registrados!');
 
             if (window.compareWwebVersions(window.Debug.VERSION, '>=', '2.3000.1014111620')) {
                 const module = window.Store.AddonReactionTable;
@@ -851,7 +922,12 @@ class Client extends EventEmitter {
                 }).bind(module);
             }
         });
-    }    
+            console.log('[DEBUG] pupPage.evaluate() completado');
+        } catch (error) {
+            console.error('[DEBUG] ERRO no pupPage.evaluate():', error);
+            throw error;
+        }
+    }
 
     async initWebVersionCache() {
         const { type: webCacheType, ...webCacheOptions } = this.options.webVersionCache;
@@ -881,6 +957,7 @@ class Client extends EventEmitter {
                 }
             });
         }
+        console.log('[DEBUG] attachEventListeners() FINALIZADO');
     }
 
     /**
